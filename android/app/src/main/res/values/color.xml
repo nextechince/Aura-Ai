@@ -1,0 +1,36 @@
+<!-- android/app/src/main/res/values/colors.xml -->
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#7B61FF</color>
+    <color name="primary_dark">#5A3FD4</color>
+    <color name="primary_light">#A78BFA</color>
+    
+    <!-- Secondary Colors -->
+    <color name="secondary">#FF6B6B</color>
+    <color name="accent">#FFB800</color>
+    <color name="success">#34D399</color>
+    
+    <!-- Background Colors -->
+    <color name="background_dark">#0A0A0F</color>
+    <color name="background_card">#12121A</color>
+    <color name="background_hover">#1A1A2E</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#9A9AB0</color>
+    <color name="text_muted">#6A6A80</color>
+    
+    <!-- Status Bar -->
+    <color name="status_bar">#0A0A0F</color>
+    <color name="navigation_bar">#0A0A0F</color>
+    
+    <!-- Splash Screen -->
+    <color name="splash_background">#0A0A0F</color>
+    <color name="splash_text">#FFFFFF</color>
+    
+    <!-- System -->
+    <color name="transparent">#00000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>
