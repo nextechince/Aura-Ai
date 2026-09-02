@@ -1,0 +1,43 @@
+<!-- android/app/src/main/res/values/strings.xml -->
+<resources>
+    <string name="app_name">Aura AI</string>
+    <string name="app_description">Your Smart Voice Assistant</string>
+    
+    <!-- Permissions -->
+    <string name="permission_rationale_microphone">Aura needs microphone access to listen for your voice commands</string>
+    <string name="permission_rationale_storage">Aura needs storage access to save files and code</string>
+    <string name="permission_rationale_contacts">Aura needs contacts access to call and message your contacts</string>
+    <string name="permission_rationale_location">Aura needs location access for weather and automation</string>
+    <string name="permission_rationale_camera">Aura needs camera access for QR codes and scanning</string>
+    <string name="permission_rationale_phone">Aura needs phone access to make calls</string>
+    <string name="permission_rationale_sms">Aura needs SMS access to send messages</string>
+    <string name="permission_rationale_notifications">Aura needs notification access for reminders and alerts</string>
+    
+    <!-- Notification -->
+    <string name="notification_channel_name">Aura AI Service</string>
+    <string name="notification_channel_description">Aura AI background service</string>
+    <string name="notification_title">Aura AI is running</string>
+    <string name="notification_text">Listening for "Hey Aura"</string>
+    
+    <!-- Voice -->
+    <string name="voice_wake_word">Hey Aura</string>
+    <string name="voice_listening">Listening...</string>
+    <string name="voice_processing">Processing...</string>
+    
+    <!-- Errors -->
+    <string name="error_general">Something went wrong. Please try again.</string>
+    <string name="error_network">Network error. Check your connection.</string>
+    <string name="error_permission">Permission denied. Please grant permission in settings.</string>
+    
+    <!-- Premium -->
+    <string name="premium_title">Upgrade to Premium</string>
+    <string name="premium_description">Unlock 90+ features</string>
+    <string name="premium_price">$2.99/month</string>
+    <string name="premium_lifetime">$15 lifetime</string>
+    
+    <!-- AdMob -->
+    <string name="admob_app_id">ca-app-pub-xxxxxxxxxxxxxxxx~xxxxxxxxxx</string>
+    <string name="admob_banner_id">ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx</string>
+    <string name="admob_interstitial_id">ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx</string>
+    <string name="admob_rewarded_id">ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx</string>
+</resources>
