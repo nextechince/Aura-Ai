@@ -14,15 +14,15 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: 18
 
     - name: Setup Java
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '17'
@@ -31,24 +31,802 @@ jobs:
       uses: android-actions/setup-android@v3
 
     - name: Cache Node Modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: node_modules
         key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
 
     - name: Install Dependencies
       run: npm install
 
+    - name: Create Android Directory Structure
+      run: |
+        mkdir -p android/app/src/main/java/com/auraai/services
+        mkdir -p android/app/src/main/java/com/auraai/receivers
+        mkdir -p android/app/src/main/res/drawable
+        mkdir -p android/app/src/main/res/layout
+        mkdir -p android/app/src/main/res/values
+        mkdir -p android/app/src/main/res/xml
+        mkdir -p android/app/src/main/res/mipmap-hdpi
+        mkdir -p android/app/src/main/res/mipmap-mdpi
+        mkdir -p android/app/src/main/res/mipmap-xhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+        mkdir -p android/gradle/wrapper
+
+    - name: Create settings.gradle
+      run: |
+        cat > android/settings.gradle << 'EOF'
+        rootProject.name = 'AuraAI'
+        apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); 
+        applyNativeModulesSettingsGradle(settings)
+        include ':app'
+        includeBuild('../node_modules/@react-native/gradle-plugin')
+        EOF
+
+    - name: Create gradle.properties
+      run: |
+        cat > android/gradle.properties << 'EOF'
+        org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
+        org.gradle.parallel=true
+        org.gradle.caching=true
+        android.useAndroidX=true
+        android.enableJetifier=true
+        android.jetifier.ignorelist=base-foundation
+        android.experimental.r8.dex-optimization=full
+        android.enableDexingArtifactTransform.desugaring=false
+        EOF
+
+    - name: Create gradle-wrapper.properties
+      run: |
+        cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.0.1-all.zip
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOF
+
+    - name: Create project build.gradle
+      run: |
+        cat > android/build.gradle << 'EOF'
+        buildscript {
+            ext {
+                buildToolsVersion = "34.0.0"
+                minSdkVersion = 24
+                compileSdkVersion = 34
+                targetSdkVersion = 34
+                ndkVersion = "23.1.7779620"
+                kotlinVersion = "1.8.0"
+            }
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath("com.android.tools.build:gradle:7.3.1")
+                classpath("com.facebook.react:react-native-gradle-plugin")
+                classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+            }
+        }
+        allprojects {
+            repositories {
+                mavenCentral()
+                google()
+                mavenLocal()
+                maven { url "$rootDir/../node_modules/react-native/android" }
+                maven { url "$rootDir/../node_modules/jsc-android/dist" }
+                maven { url 'https://maven.google.com' }
+                maven { url 'https://www.jitpack.io' }
+                maven { url 'https://developer.huawei.com/repo/' }
+            }
+        }
+        EOF
+
+    - name: Create app build.gradle
+      run: |
+        cat > android/app/build.gradle << 'EOF'
+        apply plugin: "com.android.application"
+        apply plugin: "com.facebook.react"
+
+        def enableSeparateBuildPerCPUArchitecture = false
+        def enableProguardInReleaseBuilds = false
+
+        android {
+            compileSdkVersion 34
+
+            defaultConfig {
+                applicationId "com.auraai"
+                minSdkVersion 24
+                targetSdkVersion 34
+                versionCode 1
+                versionName "1.0.0"
+                multiDexEnabled true
+                vectorDrawables.useSupportLibrary = true
+            }
+
+            signingConfigs {
+                debug {
+                    storeFile file('debug.keystore')
+                    storePassword 'android'
+                    keyAlias 'androiddebugkey'
+                    keyPassword 'android'
+                }
+                release {
+                    if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                        storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                        storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                        keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                        keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+                    }
+                }
+            }
+
+            buildTypes {
+                debug {
+                    signingConfig signingConfigs.debug
+                }
+                release {
+                    signingConfig signingConfigs.release
+                    minifyEnabled enableProguardInReleaseBuilds
+                    proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+                }
+            }
+
+            splits {
+                abi {
+                    reset()
+                    enable enableSeparateBuildPerCPUArchitecture
+                    universalApk true
+                    include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+                }
+            }
+
+            packagingOptions {
+                pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+                pickFirst 'lib/arm64-v8a/libc++_shared.so'
+                pickFirst 'lib/x86/libc++_shared.so'
+                pickFirst 'lib/x86_64/libc++_shared.so'
+            }
+        }
+
+        dependencies {
+            implementation "com.facebook.react:react-native:+"
+            implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+            implementation "androidx.multidex:multidex:2.0.1"
+            implementation 'com.google.android.gms:play-services-base:18.2.0'
+            implementation 'com.google.android.gms:play-services-location:21.0.1'
+            implementation 'com.google.android.material:material:1.10.0'
+            implementation 'com.airbnb.android:lottie:6.1.0'
+            implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+            implementation 'com.google.code.gson:gson:2.10.1'
+        }
+
+        apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); 
+        applyNativeModulesAppBuildGradle(project)
+        EOF
+
+    - name: Create proguard-rules.pro
+      run: |
+        cat > android/app/proguard-rules.pro << 'EOF'
+        -keep class com.facebook.react.** { *; }
+        -keep class com.facebook.hermes.** { *; }
+        -keep class com.facebook.soloader.** { *; }
+        -keep class com.google.android.gms.** { *; }
+        -keep class * extends com.facebook.react.uimanager.ViewManager { public *; protected *; }
+        -keepclasseswithmembers class * { native <methods>; }
+        -keepattributes *Annotation*
+        -keepattributes SourceFile,LineNumberTable
+        -keep @com.facebook.react.ReactModule class * { *; }
+        -keep @com.facebook.react.bridge.ReactContextBaseJavaModule class * { *; }
+        -keep @com.facebook.react.bridge.ReactMethod class * { *; }
+        -keep class com.google.generativeai.** { *; }
+        -dontwarn okhttp3.**
+        -dontwarn okio.**
+        -keep class com.google.gson.** { *; }
+        -keep class com.flutterwave.** { *; }
+        -keep class androidx.** { *; }
+        -dontwarn androidx.**
+        -assumenosideeffects class android.util.Log {
+            public static *** d(...);
+            public static *** v(...);
+        }
+        EOF
+
+    - name: Create AndroidManifest.xml
+      run: |
+        cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.auraai">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+            <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+            <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+            <uses-permission android:name="android.permission.READ_CONTACTS" />
+            <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+            <uses-permission android:name="android.permission.CALL_PHONE" />
+            <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+            <uses-permission android:name="android.permission.SEND_SMS" />
+            <uses-permission android:name="android.permission.READ_SMS" />
+            <uses-permission android:name="android.permission.CAMERA" />
+            <uses-feature android:name="android.hardware.camera" android:required="false" />
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.BLUETOOTH" />
+            <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+            <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+            <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+            <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+            <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+            <uses-permission android:name="android.permission.FLASHLIGHT" />
+            <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+            <uses-permission android:name="android.permission.WAKE_LOCK" />
+            <uses-permission android:name="android.permission.VIBRATE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            <uses-permission android:name="android.permission.MICROPHONE" />
+            <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+            <application
+                android:name=".MainApplication"
+                android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
+                android:label="Aura AI"
+                android:roundIcon="@mipmap/ic_launcher_round"
+                android:theme="@style/AppTheme"
+                android:usesCleartextTraffic="true"
+                android:requestLegacyExternalStorage="true"
+                android:largeHeap="true">
+
+                <activity
+                    android:name=".MainActivity"
+                    android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+                    android:exported="true"
+                    android:launchMode="singleTask"
+                    android:windowSoftInputMode="adjustResize"
+                    android:screenOrientation="portrait"
+                    android:theme="@style/SplashTheme">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+
+                <service
+                    android:name=".services.VoiceWakeService"
+                    android:enabled="true"
+                    android:exported="false"
+                    android:foregroundServiceType="microphone" />
+                
+                <service
+                    android:name=".services.AutomationService"
+                    android:enabled="true"
+                    android:exported="false"
+                    android:foregroundServiceType="mediaProjection" />
+
+                <receiver
+                    android:name=".receivers.BootReceiver"
+                    android:enabled="true"
+                    android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.BOOT_COMPLETED" />
+                        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                    </intent-filter>
+                </receiver>
+
+                <provider
+                    android:name="androidx.core.content.FileProvider"
+                    android:authorities="${applicationId}.fileprovider"
+                    android:exported="false"
+                    android:grantUriPermissions="true">
+                    <meta-data
+                        android:name="android.support.FILE_PROVIDER_PATHS"
+                        android:resource="@xml/file_paths" />
+                </provider>
+            </application>
+        </manifest>
+        EOF
+
+    - name: Create colors.xml
+      run: |
+        cat > android/app/src/main/res/values/colors.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <color name="primary">#7B61FF</color>
+            <color name="primary_dark">#5A3FD4</color>
+            <color name="primary_light">#A78BFA</color>
+            <color name="secondary">#FF6B6B</color>
+            <color name="accent">#FFB800</color>
+            <color name="success">#34D399</color>
+            <color name="background_dark">#0A0A0F</color>
+            <color name="background_card">#12121A</color>
+            <color name="text_primary">#FFFFFF</color>
+            <color name="text_secondary">#9A9AB0</color>
+            <color name="text_muted">#6A6A80</color>
+            <color name="status_bar">#0A0A0F</color>
+            <color name="navigation_bar">#0A0A0F</color>
+            <color name="splash_background">#0A0A0F</color>
+            <color name="splash_text">#FFFFFF</color>
+            <color name="white">#FFFFFFFF</color>
+            <color name="black">#FF000000</color>
+            <color name="transparent">#00000000</color>
+        </resources>
+        EOF
+
+    - name: Create strings.xml
+      run: |
+        cat > android/app/src/main/res/values/strings.xml << 'EOF'
+        <resources>
+            <string name="app_name">Aura AI</string>
+            <string name="app_description">Your Smart Voice Assistant</string>
+            <string name="permission_rationale_microphone">Aura needs microphone access for voice commands</string>
+            <string name="permission_rationale_storage">Aura needs storage access to save files</string>
+            <string name="permission_rationale_contacts">Aura needs contacts access to call contacts</string>
+            <string name="permission_rationale_location">Aura needs location access for weather</string>
+            <string name="permission_rationale_camera">Aura needs camera access for QR codes</string>
+            <string name="permission_rationale_phone">Aura needs phone access to make calls</string>
+            <string name="permission_rationale_sms">Aura needs SMS access to send messages</string>
+            <string name="permission_rationale_notifications">Aura needs notification access for reminders</string>
+            <string name="notification_channel_name">Aura AI Service</string>
+            <string name="notification_channel_description">Aura AI background service</string>
+            <string name="notification_title">Aura AI is running</string>
+            <string name="notification_text">Listening for "Hey Aura"</string>
+            <string name="voice_wake_word">Hey Aura</string>
+            <string name="voice_listening">Listening...</string>
+            <string name="voice_processing">Processing...</string>
+            <string name="error_general">Something went wrong. Please try again.</string>
+            <string name="error_network">Network error. Check your connection.</string>
+            <string name="error_permission">Permission denied. Please grant permission in settings.</string>
+            <string name="premium_title">Upgrade to Premium</string>
+            <string name="premium_description">Unlock 90+ features</string>
+            <string name="premium_price">$2.99/month</string>
+            <string name="premium_lifetime">$15 lifetime</string>
+        </resources>
+        EOF
+
+    - name: Create styles.xml
+      run: |
+        cat > android/app/src/main/res/values/styles.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+                <item name="android:statusBarColor">@color/status_bar</item>
+                <item name="android:windowLightStatusBar">false</item>
+                <item name="android:navigationBarColor">@color/navigation_bar</item>
+                <item name="android:windowLightNavigationBar">false</item>
+                <item name="android:windowBackground">@color/background_dark</item>
+                <item name="android:fontFamily">sans-serif</item>
+                <item name="android:windowTranslucentStatus">true</item>
+                <item name="android:windowTranslucentNavigation">true</item>
+                <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+            </style>
+
+            <style name="SplashTheme" parent="AppTheme">
+                <item name="android:windowBackground">@drawable/splash_background</item>
+                <item name="android:statusBarColor">@color/splash_background</item>
+                <item name="android:windowLightStatusBar">false</item>
+                <item name="android:windowFullscreen">true</item>
+                <item name="android:windowContentOverlay">@null</item>
+                <item name="android:windowNoTitle">true</item>
+                <item name="android:windowIsTranslucent">false</item>
+                <item name="android:windowDisablePreview">true</item>
+            </style>
+
+            <style name="DialogTheme" parent="Theme.AppCompat.Light.Dialog">
+                <item name="android:windowBackground">@android:color/transparent</item>
+                <item name="android:windowIsFloating">true</item>
+                <item name="android:windowContentOverlay">@null</item>
+                <item name="android:windowTitleStyle">@null</item>
+                <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+                <item name="android:windowSoftInputMode">stateUnspecified|adjustPan</item>
+            </style>
+        </resources>
+        EOF
+
+    - name: Create splash_background.xml
+      run: |
+        cat > android/app/src/main/res/drawable/splash_background.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+            <item>
+                <shape>
+                    <solid android:color="@color/splash_background" />
+                </shape>
+            </item>
+            <item android:top="0dp" android:bottom="0dp" android:left="0dp" android:right="0dp">
+                <shape>
+                    <gradient
+                        android:startColor="#0A0A0F"
+                        android:endColor="#141420"
+                        android:angle="135" />
+                </shape>
+            </item>
+            <item
+                android:width="120dp"
+                android:height="120dp"
+                android:drawable="@mipmap/ic_launcher"
+                android:gravity="center" />
+            <item android:bottom="160dp" android:gravity="center_horizontal|bottom">
+                <bitmap
+                    android:src="@mipmap/ic_launcher"
+                    android:gravity="center" />
+            </item>
+            <item android:bottom="100dp" android:gravity="center_horizontal|bottom">
+                <shape>
+                    <size android:width="200dp" android:height="4dp" />
+                    <corners android:radius="2dp" />
+                    <solid android:color="#1A1A2E" />
+                </shape>
+            </item>
+            <item android:bottom="100dp" android:gravity="center_horizontal|bottom" android:left="0dp" android:right="100dp">
+                <shape>
+                    <size android:width="100dp" android:height="4dp" />
+                    <corners android:radius="2dp" />
+                    <solid android:color="@color/primary" />
+                </shape>
+            </item>
+        </layer-list>
+        EOF
+
+    - name: Create file_paths.xml
+      run: |
+        cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <paths xmlns:android="http://schemas.android.com/apk/res/android">
+            <external-path name="external_files" path="." />
+            <external-files-path name="external_files" path="." />
+            <cache-path name="cache" path="." />
+            <external-cache-path name="external_cache" path="." />
+            <files-path name="files" path="." />
+            <root-path name="root" path="." />
+        </paths>
+        EOF
+
+    - name: Create MainActivity.java
+      run: |
+        cat > android/app/src/main/java/com/auraai/MainActivity.java << 'EOF'
+        package com.auraai;
+
+        import com.facebook.react.ReactActivity;
+        import com.facebook.react.ReactActivityDelegate;
+        import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint;
+        import com.facebook.react.defaults.DefaultReactActivityDelegate;
+        import android.os.Bundle;
+        import android.view.WindowManager;
+        import android.content.Intent;
+        import android.content.res.Configuration;
+
+        public class MainActivity extends ReactActivity {
+            @Override
+            protected String getMainComponentName() {
+                return "AuraAI";
+            }
+
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                getWindow().setStatusBarColor(getResources().getColor(R.color.status_bar));
+            }
+
+            @Override
+            protected ReactActivityDelegate createReactActivityDelegate() {
+                return new DefaultReactActivityDelegate(
+                    this,
+                    getMainComponentName(),
+                    DefaultNewArchitectureEntryPoint.getFabricEnabled()
+                );
+            }
+
+            @Override
+            public void onConfigurationChanged(Configuration newConfig) {
+                super.onConfigurationChanged(newConfig);
+                Intent intent = new Intent("onConfigurationChanged");
+                intent.putExtra("newConfig", newConfig);
+                sendBroadcast(intent);
+            }
+
+            @Override
+            public void onNewIntent(Intent intent) {
+                super.onNewIntent(intent);
+                setIntent(intent);
+            }
+        }
+        EOF
+
+    - name: Create MainApplication.java
+      run: |
+        cat > android/app/src/main/java/com/auraai/MainApplication.java << 'EOF'
+        package com.auraai;
+
+        import android.app.Application;
+        import android.content.Context;
+        import com.facebook.react.PackageList;
+        import com.facebook.react.ReactApplication;
+        import com.facebook.react.ReactInstanceManager;
+        import com.facebook.react.ReactNativeHost;
+        import com.facebook.react.ReactPackage;
+        import com.facebook.soloader.SoLoader;
+        import java.lang.reflect.InvocationTargetException;
+        import java.util.List;
+        import androidx.multidex.MultiDexApplication;
+
+        public class MainApplication extends MultiDexApplication implements ReactApplication {
+            private final ReactNativeHost mReactNativeHost = new ReactNativeHost(this) {
+                @Override
+                public boolean getUseDeveloperSupport() {
+                    return BuildConfig.DEBUG;
+                }
+
+                @Override
+                protected List<ReactPackage> getPackages() {
+                    return new PackageList(this).getPackages();
+                }
+
+                @Override
+                protected String getJSMainModuleName() {
+                    return "index";
+                }
+            };
+
+            @Override
+            public ReactNativeHost getReactNativeHost() {
+                return mReactNativeHost;
+            }
+
+            @Override
+            public void onCreate() {
+                super.onCreate();
+                SoLoader.init(this, false);
+            }
+        }
+        EOF
+
+    - name: Create VoiceWakeService.java
+      run: |
+        cat > android/app/src/main/java/com/auraai/services/VoiceWakeService.java << 'EOF'
+        package com.auraai.services;
+
+        import android.app.Notification;
+        import android.app.NotificationChannel;
+        import android.app.NotificationManager;
+        import android.app.Service;
+        import android.content.Intent;
+        import android.media.AudioFormat;
+        import android.media.AudioRecord;
+        import android.media.MediaRecorder;
+        import android.os.Build;
+        import android.os.IBinder;
+        import androidx.core.app.NotificationCompat;
+
+        public class VoiceWakeService extends Service {
+            private static final String CHANNEL_ID = "aura_voice_channel";
+            private static final int NOTIFICATION_ID = 1;
+            private AudioRecord audioRecord;
+            private boolean isRecording = false;
+
+            @Override
+            public void onCreate() {
+                super.onCreate();
+                createNotificationChannel();
+                startForeground(NOTIFICATION_ID, createNotification());
+                startWakeWordDetection();
+            }
+
+            private void createNotificationChannel() {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    NotificationChannel channel = new NotificationChannel(
+                        CHANNEL_ID,
+                        "Aura AI Voice Service",
+                        NotificationManager.IMPORTANCE_LOW
+                    );
+                    channel.setDescription("Listening for 'Hey Aura'");
+                    NotificationManager manager = getSystemService(NotificationManager.class);
+                    if (manager != null) {
+                        manager.createNotificationChannel(channel);
+                    }
+                }
+            }
+
+            private Notification createNotification() {
+                return new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("Aura AI")
+                    .setContentText("Listening for 'Hey Aura'...")
+                    .setSmallIcon(android.R.drawable.ic_mic_voice_search)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .build();
+            }
+
+            private void startWakeWordDetection() {
+                int bufferSize = AudioRecord.getMinBufferSize(
+                    16000,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                );
+                audioRecord = new AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    16000,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    bufferSize
+                );
+                audioRecord.startRecording();
+                isRecording = true;
+
+                new Thread(() -> {
+                    byte[] buffer = new byte[bufferSize];
+                    while (isRecording) {
+                        int read = audioRecord.read(buffer, 0, buffer.length);
+                        if (read > 0) {
+                            long sum = 0;
+                            for (byte b : buffer) {
+                                sum += Math.abs(b);
+                            }
+                            long average = sum / buffer.length;
+                            if (average > 500) {
+                                onWakeWordDetected();
+                            }
+                        }
+                    }
+                }).start();
+            }
+
+            private void onWakeWordDetected() {
+                Intent intent = new Intent("com.auraai.WAKE_WORD");
+                intent.putExtra("wakeWord", "aura");
+                sendBroadcast(intent);
+                
+                Intent launchIntent = getPackageManager().getLaunchIntentForPackage("com.auraai");
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(launchIntent);
+                }
+            }
+
+            @Override
+            public int onStartCommand(Intent intent, int flags, int startId) {
+                return START_STICKY;
+            }
+
+            @Override
+            public IBinder onBind(Intent intent) {
+                return null;
+            }
+
+            @Override
+            public void onDestroy() {
+                isRecording = false;
+                if (audioRecord != null) {
+                    audioRecord.stop();
+                    audioRecord.release();
+                }
+                super.onDestroy();
+            }
+        }
+        EOF
+
+    - name: Create AutomationService.java
+      run: |
+        cat > android/app/src/main/java/com/auraai/services/AutomationService.java << 'EOF'
+        package com.auraai.services;
+
+        import android.app.Notification;
+        import android.app.NotificationChannel;
+        import android.app.NotificationManager;
+        import android.app.Service;
+        import android.content.Context;
+        import android.content.Intent;
+        import android.media.projection.MediaProjection;
+        import android.media.projection.MediaProjectionManager;
+        import android.os.Build;
+        import android.os.IBinder;
+        import androidx.core.app.NotificationCompat;
+
+        public class AutomationService extends Service {
+            private static final String CHANNEL_ID = "aura_automation_channel";
+            private static final int NOTIFICATION_ID = 2;
+            private MediaProjectionManager mediaProjectionManager;
+            private MediaProjection mediaProjection;
+
+            @Override
+            public void onCreate() {
+                super.onCreate();
+                createNotificationChannel();
+                startForeground(NOTIFICATION_ID, createNotification());
+            }
+
+            private void createNotificationChannel() {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    NotificationChannel channel = new NotificationChannel(
+                        CHANNEL_ID,
+                        "Aura AI Automation",
+                        NotificationManager.IMPORTANCE_LOW
+                    );
+                    channel.setDescription("Running automation tasks");
+                    NotificationManager manager = getSystemService(NotificationManager.class);
+                    if (manager != null) {
+                        manager.createNotificationChannel(channel);
+                    }
+                }
+            }
+
+            private Notification createNotification() {
+                return new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("Aura AI")
+                    .setContentText("Running automation...")
+                    .setSmallIcon(android.R.drawable.ic_menu_camera)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .build();
+            }
+
+            @Override
+            public int onStartCommand(Intent intent, int flags, int startId) {
+                return START_STICKY;
+            }
+
+            @Override
+            public IBinder onBind(Intent intent) {
+                return null;
+            }
+
+            @Override
+            public void onDestroy() {
+                if (mediaProjection != null) {
+                    mediaProjection.stop();
+                    mediaProjection = null;
+                }
+                super.onDestroy();
+            }
+        }
+        EOF
+
+    - name: Create BootReceiver.java
+      run: |
+        cat > android/app/src/main/java/com/auraai/receivers/BootReceiver.java << 'EOF'
+        package com.auraai.receivers;
+
+        import android.content.BroadcastReceiver;
+        import android.content.Context;
+        import android.content.Intent;
+        import com.auraai.services.VoiceWakeService;
+
+        public class BootReceiver extends BroadcastReceiver {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+                    Intent serviceIntent = new Intent(context, VoiceWakeService.class);
+                    context.startForegroundService(serviceIntent);
+                }
+            }
+        }
+        EOF
+
+    - name: Create empty ic_launcher placeholder
+      run: |
+        # Create placeholder icons
+        for dir in mipmap-hdpi mipmap-mdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+          echo '<?xml version="1.0" encoding="utf-8"?>
+        <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@color/primary"/>
+            <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+        </adaptive-icon>' > android/app/src/main/res/$dir/ic_launcher.xml
+        done
+
     - name: Cache Gradle
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.gradle/caches
         key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-
-    - name: Prepare Android Keystore
-      if: github.ref == 'refs/heads/main'
-      run: |
-        echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+        restore-keys: |
+          ${{ runner.os }}-gradle-
 
     - name: Build APK
       run: |
@@ -57,20 +835,22 @@ jobs:
         ./gradlew assembleRelease
 
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: AuraAI-v1.0.0
         path: android/app/build/outputs/apk/release/app-release.apk
+        if-no-files-found: error
 
     - name: Upload Debug APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: AuraAI-Debug
         path: android/app/build/outputs/apk/debug/app-debug.apk
+        if-no-files-found: warn
 
     - name: Create Release
-      if: github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v1
+      if: github.ref == 'gs/heads/main' && success()
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v1.0.0
         name: Aura AI v1.0.0
@@ -89,10 +869,12 @@ jobs:
           - 🌍 Global Support
           
           ## 📱 Download
-          - [Download APK](https://github.com/yourusername/aura-ai/releases/download/v1.0.0/app-release.apk)
+          Download APK from artifacts above
           
           ## 📋 Installation
           1. Enable "Install from Unknown Sources"
           2. Download and install APK
           3. Open and say "Hey Aura"
         files: android/app/build/outputs/apk/release/app-release.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
