@@ -1,0 +1,14 @@
+node_modules/
+android/app/build/
+android/build/
+ios/build/
+.env
+*.jks
+*.pem
+*.log
+.DS_Store
+*.iml
+.vscode/
+.idea/
+*.apk
+*.aab
