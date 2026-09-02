@@ -1,0 +1,52 @@
+<!-- android/app/src/main/res/drawable/splash_background.xml -->
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background -->
+    <item>
+        <shape>
+            <solid android:color="@color/splash_background" />
+        </shape>
+    </item>
+    
+    <!-- Gradient Overlay -->
+    <item android:top="0dp" android:bottom="0dp" android:left="0dp" android:right="0dp">
+        <shape>
+            <gradient
+                android:startColor="#0A0A0F"
+                android:endColor="#141420"
+                android:angle="135" />
+        </shape>
+    </item>
+    
+    <!-- Logo Icon -->
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:drawable="@drawable/splash_icon"
+        android:gravity="center" />
+    
+    <!-- Text -->
+    <item android:bottom="160dp" android:gravity="center_horizontal|bottom">
+        <bitmap
+            android:src="@drawable/splash_text"
+            android:gravity="center" />
+    </item>
+    
+    <!-- Loading Bar -->
+    <item android:bottom="100dp" android:gravity="center_horizontal|bottom">
+        <shape>
+            <size android:width="200dp" android:height="4dp" />
+            <corners android:radius="2dp" />
+            <solid android:color="#1A1A2E" />
+        </shape>
+    </item>
+    
+    <!-- Loading Bar Progress -->
+    <item android:bottom="100dp" android:gravity="center_horizontal|bottom" android:left="0dp" android:right="100dp">
+        <shape>
+            <size android:width="100dp" android:height="4dp" />
+            <corners android:radius="2dp" />
+            <solid android:color="@color/primary" />
+        </shape>
+    </item>
+</layer-list>
