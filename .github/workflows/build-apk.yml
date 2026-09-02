@@ -39,7 +39,7 @@ jobs:
           ${{ runner.os }}-node-
 
     - name: Install Dependencies
-      run: npm install
+      run: npm install --legacy-peer-deps
 
     - name: Create Android Directory Structure
       run: |
